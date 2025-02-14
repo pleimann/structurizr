@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/ysmood/gson"
@@ -23,15 +24,14 @@ import (
 //go:embed all:frontend
 var assets embed.FS
 
-var viewRenderCount = 0
-
 func main() {
-	port, err := serve()
+	url, err := serve()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	debug := flag.Bool("debug", false, "Turns off Chromium headless mode for debugging")
+	watch := flag.Bool("watch", false, "Watch for changes and re-export all views")
 	outDir := flag.String("outdir", "./", "Specify an alternative directory to store rendered views")
 	flag.Parse()
 
@@ -44,12 +44,64 @@ func main() {
 		workspaceFileName = flag.Arg(0)
 	}
 
+	exportAllViews(outDir, workspaceFileName, debug, url)
+
+	if *watch {
+		fmt.Println("\nWatching for changes...")
+
+		// creates a new file watcher
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			fmt.Println("ERROR", err)
+		}
+		defer watcher.Close()
+
+		go func() {
+			for {
+				select {
+				case event, ok := <-watcher.Events:
+					if !ok {
+						return
+					}
+
+					if event.Has(fsnotify.Write) && event.Name == workspaceFileName {
+						fmt.Println("modified file:", event.Name)
+						exportAllViews(outDir, workspaceFileName, debug, url)
+					}
+
+				case err, ok := <-watcher.Errors:
+					if !ok {
+						return
+					}
+
+					fmt.Println("error:", err)
+				}
+			}
+		}()
+
+		err = watcher.Add(workspaceFileName)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Block main goroutine forever.
+		<-make(chan struct{})
+	}
+}
+
+func exportAllViews(outDir *string, workspaceFileName string, debug *bool, url string) {
 	if _, err := os.Stat(*outDir); err != nil && errors.Is(err, fs.ErrNotExist) {
 		os.MkdirAll(*outDir, os.ModePerm)
 	}
 
 	fmt.Printf("Loading workspace `%s`...", workspaceFileName)
-	workspaceContent := loadWorkspace(workspaceFileName)
+	workspaceContentBytes, err := os.ReadFile(workspaceFileName)
+	if err != nil {
+		fmt.Println("")
+		log.Fatal(err)
+	}
+	workspaceContent2 := string(workspaceContentBytes)
+	workspaceContent := workspaceContent2
 
 	l := launcher.New()
 	defer l.Cleanup()
@@ -61,16 +113,17 @@ func main() {
 	browser := rod.New().ControlURL(l.MustLaunch()).MustConnect()
 	defer browser.MustClose()
 
-	page := browser.MustPage(fmt.Sprintf("http://localhost:%s", port)).MustWaitStable()
+	page := browser.MustPage(url).MustWaitStable()
 
+	viewRenderCount := 0
 	page.MustExpose("savePng", func(g gson.JSON) (interface{}, error) {
-		saveDiagram(*outDir, g.Get("viewKey").Str(), g.Get("png").Str())
+		saveDiagram(*outDir, g.Get("viewKey").Str(), g.Get("png").Str(), &viewRenderCount)
 
 		return nil, nil
 	})
 
 	page.MustExpose("log", func(g gson.JSON) (interface{}, error) {
-		fmt.Printf("JS Log: %s", g.Str())
+		log.Printf("JS Log: %s", g.Str())
 
 		return nil, nil
 	})
@@ -89,21 +142,10 @@ func main() {
 
 	time.Sleep(time.Duration(2) * time.Second)
 
-	fmt.Printf("Exported %d diagrams of %d expected\n", viewRenderCount, len(views))
+	fmt.Printf("Exported %d of %d diagram(s)\n", viewRenderCount, len(views))
 }
 
-func loadWorkspace(workspaceFileName string) string {
-	workspaceContentBytes, err := os.ReadFile(workspaceFileName)
-	if err != nil {
-		fmt.Println("")
-		log.Fatal(err)
-	}
-	workspaceContent := string(workspaceContentBytes)
-
-	return workspaceContent
-}
-
-func saveDiagram(outDir string, diagramName string, dataURI string) string {
+func saveDiagram(outDir string, diagramName string, dataURI string, viewRenderCount *int) string {
 	b64data := dataURI[strings.IndexByte(dataURI, ',')+1:]
 	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(b64data))
 
@@ -116,11 +158,11 @@ func saveDiagram(outDir string, diagramName string, dataURI string) string {
 
 	defer file.Close()
 
-	fmt.Printf("Exporting %s...", fileName)
+	fmt.Printf("Exporting `%s`...", fileName)
 
 	_, err = io.Copy(file, reader)
 
-	viewRenderCount++
+	(*viewRenderCount)++
 
 	if err != nil {
 		log.Fatal(err)
@@ -151,5 +193,7 @@ func serve() (string, error) {
 		}
 	}()
 
-	return port, nil
+	url := fmt.Sprintf("http://localhost:%s", port)
+
+	return url, nil
 }
