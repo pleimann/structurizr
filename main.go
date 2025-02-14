@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ func main() {
 	}
 
 	debug := flag.Bool("debug", false, "Turns off Chromium headless mode for debugging")
+	outDir := flag.String("outdir", "./", "Specify an alternative directory to store rendered views")
 	flag.Parse()
 
 	if *debug {
@@ -40,6 +42,10 @@ func main() {
 	var workspaceFileName = "workspace.json"
 	if flag.NArg() >= 1 {
 		workspaceFileName = flag.Arg(0)
+	}
+
+	if _, err := os.Stat(*outDir); err != nil && errors.Is(err, fs.ErrNotExist) {
+		os.MkdirAll(*outDir, os.ModePerm)
 	}
 
 	fmt.Printf("Loading workspace `%s`...", workspaceFileName)
@@ -58,7 +64,7 @@ func main() {
 	page := browser.MustPage(fmt.Sprintf("http://localhost:%s", port)).MustWaitStable()
 
 	page.MustExpose("savePng", func(g gson.JSON) (interface{}, error) {
-		saveDiagram("./", g.Get("viewKey").Str(), g.Get("png").Str())
+		saveDiagram(*outDir, g.Get("viewKey").Str(), g.Get("png").Str())
 
 		return nil, nil
 	})
@@ -87,7 +93,6 @@ func main() {
 }
 
 func loadWorkspace(workspaceFileName string) string {
-
 	workspaceContentBytes, err := os.ReadFile(workspaceFileName)
 	if err != nil {
 		fmt.Println("")
@@ -98,11 +103,11 @@ func loadWorkspace(workspaceFileName string) string {
 	return workspaceContent
 }
 
-func saveDiagram(localDir string, diagramName string, dataURI string) string {
+func saveDiagram(outDir string, diagramName string, dataURI string) string {
 	b64data := dataURI[strings.IndexByte(dataURI, ',')+1:]
 	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(b64data))
 
-	fileName := filepath.Join(localDir, fmt.Sprint(diagramName, ".png"))
+	fileName := filepath.Join(outDir, fmt.Sprint(diagramName, ".png"))
 	file, err := os.Create(fileName)
 
 	if err != nil {
