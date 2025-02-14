@@ -33,18 +33,22 @@ func main() {
 	debug := flag.Bool("debug", false, "Turns off Chromium headless mode for debugging")
 	flag.Parse()
 
+	if *debug {
+		fmt.Println("Debug mode -- headless is disabled")
+	}
+
 	var workspaceFileName = "workspace.json"
 	if flag.NArg() >= 1 {
 		workspaceFileName = flag.Arg(0)
 	}
 
 	fmt.Printf("Loading workspace `%s`...", workspaceFileName)
+	workspaceContent := loadWorkspace(workspaceFileName)
 
 	l := launcher.New()
 	defer l.Cleanup()
 
 	if *debug {
-		fmt.Println("Debug mode turned on. Browser will be shown.")
 		l.Headless(false).Devtools(true)
 	}
 
@@ -68,26 +72,30 @@ func main() {
 	// Wait for structurizr to be ready
 	page.Wait(&rod.EvalOptions{JS: "structurizr.scripting && structurizr.scripting.isDiagramRendered() === true"})
 
+	// Load workspace into structurizr
+	views := page.MustEval("(workspaceContent) => load(workspaceContent)", workspaceContent).Arr()
+
 	fmt.Println(" DONE")
 
-	// Load workspace into structurizr
-	if workspaceContentBytes, err := os.ReadFile(workspaceFileName); err == nil {
-		workspaceContent := string(workspaceContentBytes)
-
-		views := page.MustEval("(workspaceContent) => load(workspaceContent)", workspaceContent).Arr()
-
-		for _, view := range views {
-			page.MustEval("(viewKey) => render(viewKey)", view.Get("key"))
-		}
-
-		time.Sleep(time.Duration(2) * time.Second)
-
-		fmt.Printf("Exported %d diagrams of %d expected\n", viewRenderCount, len(views))
-
-	} else {
-		log.Fatal(err)
+	for _, view := range views {
+		page.MustEval("(viewKey) => render(viewKey)", view.Get("key"))
 	}
 
+	time.Sleep(time.Duration(2) * time.Second)
+
+	fmt.Printf("Exported %d diagrams of %d expected\n", viewRenderCount, len(views))
+}
+
+func loadWorkspace(workspaceFileName string) string {
+
+	workspaceContentBytes, err := os.ReadFile(workspaceFileName)
+	if err != nil {
+		fmt.Println("")
+		log.Fatal(err)
+	}
+	workspaceContent := string(workspaceContentBytes)
+
+	return workspaceContent
 }
 
 func saveDiagram(localDir string, diagramName string, dataURI string) string {

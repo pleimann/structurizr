@@ -27,3 +27,6 @@ go.work.sum
 /*.png
 /.vscode
 /.idea
+
+strender-darwin
+strender-linux
