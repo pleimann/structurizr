@@ -6,6 +6,15 @@ structurizr.ui.RENDERING_MODE_SYSTEM = '';
 structurizr.ui.RENDERING_MODE_LIGHT = 'light';
 structurizr.ui.RENDERING_MODE_DARK = 'dark';
 
+structurizr.ui.LIGHT_MODE_DEFAULTS = {
+    background: '#ffffff',
+    color: '#444444'
+};
+structurizr.ui.DARK_MODE_DEFAULTS = {
+    background: '#111111',
+    color: '#cccccc'
+};
+
 structurizr.ui.themes = [];
 structurizr.ui.ignoredImages = [];
 
@@ -125,8 +134,8 @@ structurizr.ui.loadTheme = function(localPrebuiltThemesUrl, url) {
 
             structurizr.ui.themes.push(
                 {
-                    elements: theme.elements,
-                    relationships: theme.relationships,
+                    elements: theme.elements.sort(structurizr.util.sortStyles),
+                    relationships: theme.relationships.sort(structurizr.util.sortStyles),
                     logo: theme.logo,
                     font: theme.font
                 }
@@ -160,6 +169,7 @@ structurizr.ui.ElementStyle = function(width, height, background, color, fontSiz
     this.fontSize = fontSize;
     this.shape = shape;
     this.icon = icon;
+    this.iconPosition = 'Bottom';
     this.border = border;
     this.opacity = opacity;
     this.metadata = metadata;
@@ -172,7 +182,7 @@ structurizr.ui.ElementStyle = function(width, height, background, color, fontSiz
     };
 
     this.toString = function() {
-        return "".concat(this.tag, ",", this.width, ",", this.height, ",", this.background, ",", this.stroke, ",", this.color, ",", this.fontSize, ",", this.shape, ",", this.icon, ",", this.border, ",", this.opacity, ",", this.metadata, ",", this.description);
+        return "".concat(this.tag, ",", this.width, ",", this.height, ",", this.background, ",", this.stroke, ",", this.color, ",", this.fontSize, ",", this.shape, ",", this.icon, ",", this.iconPosition, ",", this.border, ",", this.opacity, ",", this.metadata, ",", this.description);
     };
 
 };
@@ -200,74 +210,50 @@ structurizr.ui.RelationshipStyle = function(thickness, color, dashed, routing, f
 };
 
 structurizr.ui.findElementStyle = function(element, darkMode) {
-    const defaultElementStyle = new structurizr.ui.ElementStyle(450, 300, '#dddddd', '#000000', 24, 'Box', undefined, 'Solid', undefined, 2, 100, true, true);
-    const defaultElementStyleForDeploymentNode = new structurizr.ui.ElementStyle(450, 300, '#ffffff', '#000000', 24, 'Box', undefined, 'Solid', '#888888', 1, 100, true, true);
-    const defaultBoundaryStyle = new structurizr.ui.ElementStyle(undefined, undefined, undefined, undefined, 24, undefined, undefined, undefined, undefined, 1, 100, true, true);
-
-    var defaultStyle;
-    var defaultSizeInUse = true;
-
     if (darkMode === undefined) {
         darkMode = false;
     }
 
-    if (element.type === structurizr.constants.DEPLOYMENT_NODE_ELEMENT_TYPE) {
-        defaultStyle = defaultElementStyleForDeploymentNode;
-
-        if (darkMode === true) {
-            defaultStyle.background = '#111111';
-            defaultStyle.color = '#ffffff';
-        } else {
-            defaultStyle.background = '#ffffff';
-            defaultStyle.color = '#000000';
-        }
-    } else if (element.type === 'Boundary') {
-        defaultStyle = defaultBoundaryStyle;
-    } else {
-        defaultStyle = defaultElementStyle;
-    }
+    const defaults = darkMode ? structurizr.ui.DARK_MODE_DEFAULTS : structurizr.ui.LIGHT_MODE_DEFAULTS;
+    var defaultStyle = new structurizr.ui.ElementStyle(450, 300, undefined, undefined, 24, 'Box', undefined, 'Solid', undefined, 2, 100, true, true);
+    var defaultSizeInUse = true;
 
     var elementStylesMap = {};
+    var elementStyles = [];
 
-    if (structurizr.ui.themes.length > 0) {
-        // use the styles defined in the theme as a starting point
-        structurizr.ui.themes.forEach(function(theme) {
-            theme.elements.forEach(function(elementStyle) {
-                elementStylesMap[elementStyle.tag] = elementStyle;
-            });
-        })
+    // use the styles defined in the theme as a starting point
+    structurizr.ui.themes.forEach(function(theme) {
+        elementStyles = elementStyles.concat(theme.elements);
+    });
 
-        // (1) add workspace styles that are not defined in the theme
-        // (2) override the styles defined in the theme where necessary
-        structurizr.workspace.views.configuration.styles.elements.forEach(function(elementStyleFromWorkspace) {
-            const tag = elementStyleFromWorkspace.tag;
-            var elementStyle = elementStylesMap[tag];
+    // then the styles defined in the workspace
+    elementStyles = elementStyles.concat(structurizr.workspace.views.configuration.styles.elements);
+
+    elementStyles.forEach(function(elementStyleDefinition) {
+        const colorScheme = darkMode ? 'Dark' : 'Light';
+        if (elementStyleDefinition.colorScheme === undefined || elementStyleDefinition.colorScheme === colorScheme) {
+            const tag = elementStyleDefinition.tag;
+            const elementStyle = elementStylesMap[tag];
 
             if (elementStyle === undefined) {
-                // the workspace has an element style defined for a tag that isn't in the theme, so add it
-                elementStylesMap[tag] = elementStyleFromWorkspace;
+                elementStylesMap[tag] = elementStyleDefinition;
             } else {
-                // both the theme and workspace have an element style defined for a tag, so override the attributes
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'width');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'height');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'background');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'stroke');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'color');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'fontSize');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'shape');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'icon');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'border');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'opacity');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'metadata');
-                structurizr.util.copyAttributeIfSpecified(elementStyleFromWorkspace, elementStyle, 'description');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'width');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'height');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'background');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'stroke');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'color');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'fontSize');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'shape');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'icon');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'iconPosition');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'border');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'opacity');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'metadata');
+                structurizr.util.copyAttributeIfSpecified(elementStyleDefinition, elementStyle, 'description');
             }
-        });
-    } else {
-        structurizr.workspace.views.configuration.styles.elements.forEach(function(elementStyleFromWorkspace) {
-            const tag = elementStyleFromWorkspace.tag;
-            elementStylesMap[tag] = elementStyleFromWorkspace;
-        });
-    }
+        }
+    });
 
     var style = new structurizr.ui.ElementStyle(
         defaultStyle.width,
@@ -303,6 +289,7 @@ structurizr.ui.findElementStyle = function(element, darkMode) {
             style.copyStyleAttributeIfSpecified(elementStyle, 'fontSize');
             style.copyStyleAttributeIfSpecified(elementStyle, 'shape');
             style.copyStyleAttributeIfSpecified(elementStyle, 'icon');
+            style.copyStyleAttributeIfSpecified(elementStyle, 'iconPosition');
             style.copyStyleAttributeIfSpecified(elementStyle, 'border');
             style.copyStyleAttributeIfSpecified(elementStyle, 'opacity');
             style.copyStyleAttributeIfSpecified(elementStyle, 'metadata');
@@ -315,8 +302,27 @@ structurizr.ui.findElementStyle = function(element, darkMode) {
         }
     }
 
-    if (style.stroke === undefined && style.background) {
-        style.stroke = structurizr.util.shadeColor(style.background, -10);
+    if (element.type === 'Boundary') {
+        // do nothing
+    } else {
+        if (style.background !== undefined) {
+            // the background has been defined, so default the stroke to a darker version if necessary
+            if (style.stroke === undefined) {
+                style.stroke = structurizr.util.shadeColor(style.background, -10);
+            }
+        }
+
+        if (style.background === undefined) {
+            style.background = defaults.background;
+        }
+
+        if (style.stroke === undefined) {
+            style.stroke = defaults.color;
+        }
+
+        if (style.color === undefined) {
+            style.color = defaults.color;
+        }
     }
 
     if (style.strokeWidth !== undefined) {
@@ -358,58 +364,47 @@ structurizr.ui.findElementStyle = function(element, darkMode) {
 };
 
 structurizr.ui.findRelationshipStyle = function(relationship, darkMode) {
-    const defaultRelationshipStyle = new structurizr.ui.RelationshipStyle(2, '#707070', true, 'Direct', 24, 200, 50, 100);
-
     if (darkMode === undefined) {
         darkMode = false;
     }
 
+    const defaults = darkMode ? structurizr.ui.DARK_MODE_DEFAULTS : structurizr.ui.LIGHT_MODE_DEFAULTS;
+    const defaultRelationshipStyle = new structurizr.ui.RelationshipStyle(2, defaults.color, true, 'Direct', 24, 200, 50, 100);
+
     var defaultStyle = defaultRelationshipStyle;
 
-    if (darkMode === true) {
-        defaultStyle.color = '#aaaaaa';
-    } else {
-        defaultStyle.color = '#707070';
-    }
-
     var relationshipStylesMap = {};
+    var relationshipStyles = [];
 
-    if (structurizr.ui.themes.length > 0) {
-        // use the styles defined in the theme as a starting point
-        structurizr.ui.themes.forEach(function(theme) {
-            theme.relationships.forEach(function(relationshipStyle) {
-                relationshipStylesMap[relationshipStyle.tag] = relationshipStyle;
-            });
-        })
+    // use the styles defined in the theme as a starting point
+    structurizr.ui.themes.forEach(function(theme) {
+        relationshipStyles = relationshipStyles.concat(theme.relationships);
+    });
 
-        // (1) add workspace styles that are not defined in the theme
-        // (2) override the styles defined in the theme where necessary
-        structurizr.workspace.views.configuration.styles.relationships.forEach(function(relationshipStyleFromWorkspace) {
-            const tag = relationshipStyleFromWorkspace.tag;
+    // then the styles defined in the workspace
+    relationshipStyles = relationshipStyles.concat(structurizr.workspace.views.configuration.styles.relationships);
+
+    relationshipStyles.forEach(function(relationshipStyleDefinition) {
+        const colorScheme = darkMode ? 'Dark' : 'Light';
+        if (relationshipStyleDefinition.colorScheme === undefined || relationshipStyleDefinition.colorScheme === colorScheme) {
+            const tag = relationshipStyleDefinition.tag;
             var relationshipStyle = relationshipStylesMap[tag];
 
             if (relationshipStyle === undefined) {
-                // the workspace has a relationship style defined for a tag that isn't in the theme, so add it
-                relationshipStylesMap[tag] = relationshipStyleFromWorkspace;
+                relationshipStylesMap[tag] = relationshipStyleDefinition;
             } else {
-                // both the theme and workspace have an element style defined for a tag, so override the attributes
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'thickness');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'color');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'dashed');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'style');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'routing');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'fontSize');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'width');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'position');
-                structurizr.util.copyAttributeIfSpecified(relationshipStyleFromWorkspace, relationshipStyle, 'opacity');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'thickness');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'color');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'dashed');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'style');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'routing');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'fontSize');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'width');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'position');
+                structurizr.util.copyAttributeIfSpecified(relationshipStyleDefinition, relationshipStyle, 'opacity');
             }
-        });
-    } else {
-        structurizr.workspace.views.configuration.styles.relationships.forEach(function(relationshipStyleFromWorkspace) {
-            const tag = relationshipStyleFromWorkspace.tag;
-            relationshipStylesMap[tag] = relationshipStyleFromWorkspace;
-        });
-    }
+        }
+    });
 
     var style = new structurizr.ui.RelationshipStyle(
         defaultStyle.thickness,
