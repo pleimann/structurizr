@@ -35,10 +35,6 @@ func main() {
 	outDir := flag.String("outdir", "./", "Specify an alternative directory to store rendered views")
 	flag.Parse()
 
-	if *debug {
-		fmt.Println("Debug mode -- headless is disabled")
-	}
-
 	var workspaceFileName = "workspace.json"
 	if flag.NArg() >= 1 {
 		workspaceFileName = flag.Arg(0)
@@ -47,45 +43,49 @@ func main() {
 	exportAllViews(outDir, workspaceFileName, debug, url)
 
 	if *watch {
-		fmt.Println("\nWatching for changes...")
-
-		// creates a new file watcher
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			fmt.Println("ERROR", err)
-		}
-		defer watcher.Close()
-
-		go func() {
-			for {
-				select {
-				case event, ok := <-watcher.Events:
-					if !ok {
-						return
-					}
-
-					if event.Has(fsnotify.Write) && event.Name == workspaceFileName {
-						fmt.Println("modified file:", event.Name)
-						exportAllViews(outDir, workspaceFileName, debug, url)
-					}
-
-				case err, ok := <-watcher.Errors:
-					if !ok {
-						return
-					}
-
-					fmt.Println("error:", err)
-				}
-			}
-		}()
-
-		err = watcher.Add(workspaceFileName)
-		if err != nil {
-			log.Fatal(err)
-		}
+		watchWorkspaceFile(workspaceFileName, outDir, debug, url)
 
 		// Block main goroutine forever.
 		<-make(chan struct{})
+	}
+}
+
+func watchWorkspaceFile(workspaceFileName string, outDir *string, debug *bool, url string) {
+	fmt.Println("\nWatching for changes...")
+
+	// creates a new file watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		fmt.Println("ERROR", err)
+	}
+	defer watcher.Close()
+
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+
+				if event.Has(fsnotify.Write) && event.Name == workspaceFileName {
+					fmt.Println("modified file:", event.Name)
+					exportAllViews(outDir, workspaceFileName, debug, url)
+				}
+
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+
+				fmt.Println("error:", err)
+			}
+		}
+	}()
+
+	err = watcher.Add(workspaceFileName)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -97,16 +97,18 @@ func exportAllViews(outDir *string, workspaceFileName string, debug *bool, url s
 	fmt.Printf("Loading workspace `%s`...", workspaceFileName)
 	workspaceContentBytes, err := os.ReadFile(workspaceFileName)
 	if err != nil {
-		fmt.Println("")
 		log.Fatal(err)
 	}
-	workspaceContent2 := string(workspaceContentBytes)
-	workspaceContent := workspaceContent2
+
+	workspaceContent := string(workspaceContentBytes)
 
 	l := launcher.New()
 	defer l.Cleanup()
 
+	l.Leakless(true)
+
 	if *debug {
+		fmt.Println("\nDebug mode -- headless is disabled")
 		l.Headless(false).Devtools(true)
 	}
 
@@ -147,6 +149,7 @@ func exportAllViews(outDir *string, workspaceFileName string, debug *bool, url s
 
 func saveDiagram(outDir string, diagramName string, dataURI string, viewRenderCount *int) string {
 	b64data := dataURI[strings.IndexByte(dataURI, ',')+1:]
+
 	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(b64data))
 
 	fileName := filepath.Join(outDir, fmt.Sprint(diagramName, ".png"))

@@ -14,6 +14,7 @@
   <script src="/js/lodash-4.17.21.js"></script>
   <script src="/js/backbone-1.4.1.js"></script>
   <script src="/js/joint-3.6.5.js"></script>
+  <script src="/js/rgbcolor.js"></script>
   <script src="/js/canvg-1.5.4.js"></script>
 
   <script src="/js/structurizr.js"></script>
@@ -57,15 +58,15 @@
 
     function render(viewKey) {
       try {
-          diagram.changeView(viewKey, async () => {
-            const png = diagram.exportCurrentDiagramToPNG({ includeMetadata: false, crop: true });
-            
-            await savePng({ viewKey, png })
-          });
+        diagram.changeView(viewKey, async () => {
+          const png = diagram.exportCurrentDiagramToPNG({ includeMetadata: false, crop: true });
+          
+          await savePng({ viewKey, png })
+        });
 
-        } catch (e) {
-          log(`Diagram for view ${viewKey} cannot be rendered: ${e.message}`);
-        }
+      } catch (e) {
+        log(`Diagram for view ${viewKey} cannot be rendered: ${e.message}`);
+      }
     }
 
     function load(workspaceContent) {
