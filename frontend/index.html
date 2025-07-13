@@ -56,17 +56,23 @@
   <script>
     let diagram;
 
-    function render(viewKey) {
-      try {
-        diagram.changeView(viewKey, async () => {
-          const png = diagram.exportCurrentDiagramToPNG({ includeMetadata: false, crop: true });
-          
-          await savePng({ viewKey, png })
-        });
-
-      } catch (e) {
-        log(`Diagram for view ${viewKey} cannot be rendered: ${e.message}`);
-      }
+    async function render(viewKey) {
+      return new Promise((resolve, reject) => {
+        try {
+          diagram.changeView(viewKey, async () => {
+            const svg = diagram.exportCurrentDiagramToSVG(false, false);
+  
+            diagram.exportCurrentDiagramToPNG(false, true, async (png) => {
+              pngBase64 = png.replace(/^data:image\/(png|jpg);base64,/, "");
+              
+              resolve(pngBase64);
+            });
+          });
+  
+        } catch (e) {
+          reject(`Diagram for view ${viewKey} cannot be rendered: ${e.message}`);
+        }
+      });
     }
 
     function load(workspaceContent) {

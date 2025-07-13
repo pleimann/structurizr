@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/go-rod/rod"
@@ -124,12 +123,6 @@ func exportAllViews(outDir *string, workspaceFileName string, debug *bool, url s
 		return nil, nil
 	})
 
-	page.MustExpose("log", func(g gson.JSON) (interface{}, error) {
-		log.Printf("JS Log: %s", g.Str())
-
-		return nil, nil
-	})
-
 	// Wait for structurizr to be ready
 	page.Wait(&rod.EvalOptions{JS: "structurizr.scripting && structurizr.scripting.isDiagramRendered() === true"})
 
@@ -139,17 +132,13 @@ func exportAllViews(outDir *string, workspaceFileName string, debug *bool, url s
 	fmt.Println(" DONE")
 
 	for _, view := range views {
-		page.MustEval("(viewKey) => render(viewKey)", view.Get("key"))
+		page.MustEval("async (viewKey) => { await render(viewKey).then(png => savePng({ viewKey, png })); }", view.Get("key"))
 	}
-
-	time.Sleep(time.Duration(2) * time.Second)
 
 	fmt.Printf("Exported %d of %d diagram(s)\n", viewRenderCount, len(views))
 }
 
-func saveDiagram(outDir string, diagramName string, dataURI string, viewRenderCount *int) string {
-	b64data := dataURI[strings.IndexByte(dataURI, ',')+1:]
-
+func saveDiagram(outDir string, diagramName string, b64data string, viewRenderCount *int) string {
 	reader := base64.NewDecoder(base64.StdEncoding, strings.NewReader(b64data))
 
 	fileName := filepath.Join(outDir, fmt.Sprint(diagramName, ".png"))

@@ -33,3 +33,6 @@ go.work.sum
 
 strender*
 structurizr-renderer
+
+workspace.json
+
