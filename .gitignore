@@ -31,7 +31,7 @@ go.work.sum
 /.idea
 /out
 
-strender*
+/bin/
 structurizr-renderer
 
 workspace.json
