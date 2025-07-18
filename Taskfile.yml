@@ -1,0 +1,115 @@
+version: "3"
+
+vars:
+  LDFLAGS: "-s -w"
+  BIN_DIR: "bin"
+  # Default platforms to build for
+  PLATFORMS:
+    sh: echo "darwin/arm64 darwin/amd64 linux/amd64 linux/arm64"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BIN_DIR}}
+
+  build:
+    desc: Build binaries for specified platforms (default all)
+    deps: [clean]
+    vars:
+      # Use CLI_ARGS if provided, otherwise use default PLATFORMS
+      TARGET_PLATFORMS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.PLATFORMS}}{{end}}"
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - |
+        for platform in {{.TARGET_PLATFORMS}}; do
+          IFS="/" read -r os arch <<< "$platform"
+          echo "Building for $os/$arch..."
+          env CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/strender-$os-$arch .
+        done
+    status:
+      - test -d {{.BIN_DIR}}
+
+  build-local:
+    desc: Build for current platform only
+    internal: true
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/strender .
+
+  install:
+    desc: Build and install to ~/bin/strender
+    vars:
+      ARCH:
+        sh: arch
+      PLATFORM:
+        sh: uname | tr '[:upper:]' '[:lower:]'
+    cmds:
+      - task: build
+        vars:
+          CLI_ARGS: "{{.PLATFORM}}/{{.ARCH}}"
+      - cp {{.BIN_DIR}}/strender-{{.PLATFORM}}-{{.ARCH}} ~/bin/strender
+    preconditions:
+      - sh: test -d ~/bin
+        msg: "~/bin directory does not exist"
+
+  release:
+    desc: Create a GitHub release (requires version argument)
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "ERROR: Must provide release version as argument"
+          echo "Usage: task release -- v1.0.0"
+          exit 1
+        fi
+
+        # Build all platforms first
+        task build
+
+        # Create release with all binaries
+        gh release create {{.CLI_ARGS}} \
+          --generate-notes \
+          --draft \
+          --latest \
+          "{{.BIN_DIR}}/strender-darwin-arm64#MacOS Arm64" \
+          "{{.BIN_DIR}}/strender-darwin-amd64#MacOS x64" \
+          "{{.BIN_DIR}}/strender-linux-arm64#Linux Arm64" \
+          "{{.BIN_DIR}}/strender-linux-amd64#Linux x64"
+    preconditions:
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "GitHub CLI (gh) is required but not installed"
+
+  structurizr-pull:
+    desc: Download latest Structurizr UI files from GitHub
+    vars:
+      FRONTEND_DIR: "renderer/frontend"
+      BASE_URL: "https://raw.githubusercontent.com/structurizr/ui/refs/heads/main/src"
+    cmds:
+      - mkdir -p {{.FRONTEND_DIR}}/js {{.FRONTEND_DIR}}/css
+      # Download JS files
+      - curl -o {{.FRONTEND_DIR}}/js/structurizr.js {{.BASE_URL}}/js/structurizr.js
+      - curl -o {{.FRONTEND_DIR}}/js/structurizr-content.js {{.BASE_URL}}/js/structurizr-content.js
+      - curl -o {{.FRONTEND_DIR}}/js/structurizr-diagram.js {{.BASE_URL}}/js/structurizr-diagram.js
+      - curl -o {{.FRONTEND_DIR}}/js/structurizr-ui.js {{.BASE_URL}}/js/structurizr-ui.js
+      - curl -o {{.FRONTEND_DIR}}/js/structurizr-util.js {{.BASE_URL}}/js/structurizr-util.js
+      - curl -o {{.FRONTEND_DIR}}/js/structurizr-workspace.js {{.BASE_URL}}/js/structurizr-workspace.js
+      # Download CSS files
+      - curl -o {{.FRONTEND_DIR}}/css/structurizr.css {{.BASE_URL}}/css/structurizr.css
+      - curl -o {{.FRONTEND_DIR}}/css/structurizr-diagram.css {{.BASE_URL}}/css/structurizr-diagram.css
+
+  dev:
+    desc: Run in development mode with watch
+    cmds:
+      - task: build-local
+      - ./{{.BIN_DIR}}/strender -watch -outdir ./out big-bank-plc.json
+
+  debug:
+    desc: Run in debug mode (non-headless)
+    cmds:
+      - task: build-local
+      - ./{{.BIN_DIR}}/strender -debug -outdir ./out big-bank-plc.json
