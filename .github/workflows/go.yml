@@ -15,8 +15,8 @@ on:
       - main
 
 jobs:
-
   build:
+    name: Build strender Binaries
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -31,3 +31,16 @@ jobs:
 
     - name: Test
       run: go test -v ./...
+
+  test:
+    name: Render Architecture Diagrams
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Render Structurizr diagrams
+        uses: pleimann/structurizr-renderer@v1
+        with:
+          workspace: 'big-bank-plc.json'
+          output-dir: 'diagrams'

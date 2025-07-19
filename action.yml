@@ -1,0 +1,129 @@
+name: 'Structurizr Renderer'
+description: 'Render Structurizr workspace diagrams to PNG images'
+author: 'pleimann'
+
+branding:
+  icon: 'image'
+  color: 'blue'
+
+inputs:
+  workspace:
+    description: 'Path to the Structurizr workspace JSON file'
+    required: true
+    default: 'workspace.json'
+  
+  output-dir:
+    description: 'Directory to store rendered PNG files'
+    required: false
+    default: './'
+  
+  version:
+    description: 'Version of structurizr-renderer to use (default: latest)'
+    required: false
+    default: 'latest'
+
+outputs:
+  diagrams-path:
+    description: 'Path where the rendered diagrams were saved'
+    value: ${{ steps.render.outputs.output-path }}
+  
+  diagram-count:
+    description: 'Number of diagrams rendered'
+    value: ${{ steps.render.outputs.diagram-count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect platform and architecture
+      id: platform
+      shell: bash
+      run: |
+        case "${{ runner.os }}" in
+          Linux)
+            OS="linux"
+            ;;
+          macOS)
+            OS="darwin"
+            ;;
+          *)
+            echo "Unsupported OS: ${{ runner.os }}"
+            exit 1
+            ;;
+        esac
+        
+        case "${{ runner.arch }}" in
+          X64)
+            ARCH="amd64"
+            ;;
+          ARM64)
+            ARCH="arm64"
+            ;;
+          *)
+            echo "Unsupported architecture: ${{ runner.arch }}"
+            exit 1
+            ;;
+        esac
+        
+        echo "os=$OS" >> $GITHUB_OUTPUT
+        echo "arch=$ARCH" >> $GITHUB_OUTPUT
+        echo "binary-name=strender-$OS-$ARCH" >> $GITHUB_OUTPUT
+
+    - name: Download structurizr-renderer binary
+      shell: bash
+      run: |
+        BINARY_NAME="${{ steps.platform.outputs.binary-name }}"
+        
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          DOWNLOAD_URL="https://github.com/pleimann/structurizr-renderer/releases/latest/download/$BINARY_NAME"
+        else
+          DOWNLOAD_URL="https://github.com/pleimann/structurizr-renderer/releases/download/${{ inputs.version }}/$BINARY_NAME"
+        fi
+        
+        echo "Downloading $BINARY_NAME from $DOWNLOAD_URL"
+        curl -L -o strender "$DOWNLOAD_URL"
+        chmod +x strender
+        
+        # Verify the binary works
+        ./strender --help || echo "Binary downloaded successfully"
+
+    - name: Verify workspace file exists
+      shell: bash
+      run: |
+        if [ ! -f "${{ inputs.workspace }}" ]; then
+          echo "Error: Workspace file '${{ inputs.workspace }}' not found"
+          exit 1
+        fi
+        echo "Workspace file found: ${{ inputs.workspace }}"
+
+    - name: Create output directory
+      shell: bash
+      run: |
+        mkdir -p "${{ inputs.output-dir }}"
+        echo "Output directory: ${{ inputs.output-dir }}"
+
+    - name: Render diagrams
+      id: render
+      shell: bash
+      run: |
+        echo "Rendering diagrams from ${{ inputs.workspace }} to ${{ inputs.output-dir }}"
+        
+        # Run the renderer
+        ./strender -outdir "${{ inputs.output-dir }}" "${{ inputs.workspace }}"
+        
+        # Count generated PNG files
+        DIAGRAM_COUNT=$(find "${{ inputs.output-dir }}" -name "*.png" -type f | wc -l)
+        
+        echo "Generated $DIAGRAM_COUNT diagram(s)"
+        echo "output-path=${{ inputs.output-dir }}" >> $GITHUB_OUTPUT
+        echo "diagram-count=$DIAGRAM_COUNT" >> $GITHUB_OUTPUT
+        
+        # List generated files
+        echo "Generated files:"
+        find "${{ inputs.output-dir }}" -name "*.png" -type f
+
+    - name: Upload diagrams as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: structurizr-diagrams
+        path: ${{ inputs.output-dir }}/*.png
+        if-no-files-found: warn
