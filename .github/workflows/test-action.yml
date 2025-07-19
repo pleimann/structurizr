@@ -15,23 +15,6 @@ on:
       - main
 
 jobs:
-  build:
-    name: Build strender Binaries
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24'
-
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v ./...
-
   test:
     name: Render Architecture Diagrams
     runs-on: ubuntu-latest
@@ -40,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Render Structurizr diagrams
-        uses: pleimann/structurizr-renderer@v1
+        uses: pleimann/structurizr@v0.0.5
         with:
           workspace: 'big-bank-plc.json'
           output-dir: 'diagrams'
