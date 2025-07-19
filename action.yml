@@ -86,6 +86,12 @@ runs:
         # Verify the binary works
         ./strender --help || echo "Binary downloaded successfully"
 
+
+    - name: Install Chrome
+      shell: bash
+      uses: browser-actions/setup-chrome@v2
+      run: chrome --version
+
     - name: Verify workspace file exists
       shell: bash
       run: |
