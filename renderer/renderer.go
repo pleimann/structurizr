@@ -23,20 +23,29 @@ var assets embed.FS
 
 type Renderer struct {
 	url               string
+	browserPath       string
 	debug             bool
 	workspaceFileName string
 }
 
-func New(workspaceFileName string, debug bool) Renderer {
+func New(workspaceFileName string, browserPath *string, debug bool) Renderer {
 	url, err := serve()
 
 	if err != nil {
 		log.Fatalf("Error serving static Structurizr UI site: %v", err)
 	}
 
+	path, _ := launcher.LookPath()
+	if browserPath != nil {
+		path = *browserPath
+	}
+
+	fmt.Printf("Browser path: %s\n", path)
+
 	r := Renderer{
 		workspaceFileName: workspaceFileName,
 		url:               url,
+		browserPath:       path,
 		debug:             debug,
 	}
 
@@ -59,7 +68,9 @@ func (r *Renderer) ExportAllViews(outDir *string) {
 	l := launcher.New()
 	defer l.Cleanup()
 
-	l.Leakless(true)
+	// Find locally installed broweser
+	l.Leakless(true).
+		Bin(r.browserPath)
 
 	if r.debug {
 		fmt.Println("\nDebug mode -- headless is disabled")

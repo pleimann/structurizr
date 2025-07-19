@@ -86,11 +86,8 @@ runs:
         # Verify the binary works
         ./strender --help || echo "Binary downloaded successfully"
 
-
     - name: Install Chrome
-      shell: bash
       uses: browser-actions/setup-chrome@v2
-      run: chrome --version
 
     - name: Verify workspace file exists
       shell: bash
@@ -114,7 +111,7 @@ runs:
         echo "Rendering diagrams from ${{ inputs.workspace }} to ${{ inputs.output-dir }}"
         
         # Run the renderer
-        ./strender -outdir "${{ inputs.output-dir }}" "${{ inputs.workspace }}"
+        ./strender -outdir "${{ inputs.output-dir }}" -browser "${{ steps.setup-chrome.outputs.chrome-path }}" "${{ inputs.workspace }}"
         
         # Count generated PNG files
         DIAGRAM_COUNT=$(find "${{ inputs.output-dir }}" -name "*.png" -type f | wc -l)
