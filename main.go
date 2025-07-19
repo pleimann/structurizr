@@ -13,6 +13,8 @@ func main() {
 	debug := flag.Bool("debug", false, "Turns off Chromium headless mode for debugging")
 	watch := flag.Bool("watch", false, "Watch for changes and re-export all views")
 	outDir := flag.String("outdir", "./", "Specify an alternative directory to store rendered views")
+	browserPath := flag.String("browser", "", "The absolute path to the pre-installed browser executable")
+
 	flag.Parse()
 
 	var workspaceFileName = "workspace.json"
@@ -20,7 +22,7 @@ func main() {
 		workspaceFileName = flag.Arg(0)
 	}
 
-	r := renderer.New(workspaceFileName, *debug)
+	r := renderer.New(workspaceFileName, browserPath, *debug)
 
 	r.ExportAllViews(outDir)
 

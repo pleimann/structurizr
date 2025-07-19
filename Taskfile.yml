@@ -106,7 +106,7 @@ tasks:
     desc: Run in development mode with watch
     cmds:
       - task: build-local
-      - ./{{.BIN_DIR}}/strender -watch -outdir ./out big-bank-plc.json
+      - ./{{.BIN_DIR}}/strender -watch -browser "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" -outdir ./out big-bank-plc.json
 
   debug:
     desc: Run in debug mode (non-headless)
