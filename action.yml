@@ -7,15 +7,19 @@ branding:
   color: 'blue'
 
 inputs:
+  repo-token:
+    description: 'GITHUB_TOKEN from secrets'
+    required: true
+
   workspace:
     description: 'Path to the Structurizr workspace JSON file'
     required: true
-    default: 'workspace.json'
+    default: 'docs/workspace.json'
   
   output-dir:
     description: 'Directory to store rendered PNG files'
     required: false
-    default: './'
+    default: 'docs/diagrams'
   
   version:
     description: 'Version of structurizr-renderer to use (default: latest)'
@@ -34,6 +38,17 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      env:
+        GITHUB_TOKEN: ${{ inputs.repo-token }}
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Setup Git
+      run: git config --global --add safe.directory $PWD
+      shell: bash
+
     - name: Detect platform and architecture
       id: platform
       shell: bash
@@ -130,3 +145,25 @@ runs:
         name: structurizr-diagrams
         path: ${{ inputs.output-dir }}/*.png
         if-no-files-found: warn
+
+    - name: Check for Changes
+      id: check_changes
+      run: |
+        git add *.png
+        if git diff --staged --quiet; then
+          echo "CHANGES_EXIST=false" >> $GITHUB_ENV
+        else
+          echo "CHANGES_EXIST=true" >> $GITHUB_ENV
+        fi
+      shell: bash
+
+    - name: Commit and Push Diagrams
+      if: env.CHANGES_EXIST == 'true'
+      env:
+        GITHUB_TOKEN: ${{ inputs.repo-token }}
+      run: |
+        git config --global user.name github-actions
+        git config --global user.email github-actions@github.com
+        git commit -m "chore: Update Structurizr diagrams"
+        git push origin HEAD:${GITHUB_HEAD_REF}
+      shell: bash
