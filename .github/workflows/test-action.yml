@@ -20,7 +20,8 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Render Structurizr diagrams
-        uses: pleimann/structurizr@v0.0.5
+        uses: pleimann/structurizr
         with:
           workspace: 'big-bank-plc.json'
           output-dir: 'diagrams'
+          version: v0.0.5
