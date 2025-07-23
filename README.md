@@ -50,8 +50,8 @@ jobs:
         uses: pleimann/structurizr-renderer@v1
         with:
           workspace: 'architecture/workspace.json'
-          output-dir: 'docs/images'
-          version: 'v1.2.0'
+          output-dir: 'docs/diagrams'
+          version: 'v1'
       
       - name: Check render results
         run: |
@@ -62,7 +62,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add docs/images/*.png
+          git add docs/diagrams/*.png
           git diff --staged --quiet || git commit -m "Update architecture diagrams"
           git push
 ```
@@ -84,8 +84,8 @@ jobs:
 
 ## Features
 
-- **Cross-platform**: Works on Ubuntu, macOS, and Windows runners
-- **Automatic binary download**: Downloads the appropriate binary for the runner's platform
+- **Cross-platform**: Works on Ubuntu and macOS runners
+- **Automatic binary download**: Downloads the appropriate binary for the runner's platform and architecture
 - **Artifact upload**: Automatically uploads generated PNG files as GitHub artifacts
 - **Error handling**: Validates workspace file exists and provides clear error messages
 - **Flexible versioning**: Use latest release or specify a specific version

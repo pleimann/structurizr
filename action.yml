@@ -74,9 +74,9 @@ runs:
         BINARY_NAME="${{ steps.platform.outputs.binary-name }}"
         
         if [ "${{ inputs.version }}" = "latest" ]; then
-          DOWNLOAD_URL="https://github.com/pleimann/structurizr-renderer/releases/latest/download/$BINARY_NAME"
+          DOWNLOAD_URL="https://github.com/pleimann/structurizr/releases/latest/download/$BINARY_NAME"
         else
-          DOWNLOAD_URL="https://github.com/pleimann/structurizr-renderer/releases/download/${{ inputs.version }}/$BINARY_NAME"
+          DOWNLOAD_URL="https://github.com/pleimann/structurizr/releases/download/${{ inputs.version }}/$BINARY_NAME"
         fi
         
         echo "Downloading $BINARY_NAME from $DOWNLOAD_URL"
@@ -115,14 +115,12 @@ runs:
         
         # Count generated PNG files
         DIAGRAM_COUNT=$(find "${{ inputs.output-dir }}" -name "*.png" -type f | wc -l)
-        
-        echo "Generated $DIAGRAM_COUNT diagram(s)"
-        echo "output-path=${{ inputs.output-dir }}" >> $GITHUB_OUTPUT
-        echo "diagram-count=$DIAGRAM_COUNT" >> $GITHUB_OUTPUT
-        
-        # List generated files
-        echo "Generated files:"
-        find "${{ inputs.output-dir }}" -name "*.png" -type f
+
+        echo "Rendered $DIAGRAM_COUNT Diagrams" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        for file in "${{ inputs.output-dir }}/*.png"; do
+          echo "- $file" >> $GITHUB_STEP_SUMMARY
+        done
 
     - name: Upload diagrams as artifacts
       uses: actions/upload-artifact@v4
