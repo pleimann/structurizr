@@ -71,8 +71,7 @@ func (r *Renderer) ExportAllViews(outDir *string) {
 	defer l.Cleanup()
 
 	// Find locally installed broweser
-	l.Leakless(true).
-		Bin(r.browserPath)
+	l.NoSandbox(true).Leakless(true).Bin(r.browserPath)
 
 	if r.debug {
 		fmt.Println("\nDebug mode -- headless is disabled")

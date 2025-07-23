@@ -21,13 +21,10 @@ tasks:
   build:
     desc: Build binaries for specified platforms (default all)
     deps: [clean]
-    vars:
-      # Use CLI_ARGS if provided, otherwise use default PLATFORMS
-      TARGET_PLATFORMS: "{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}{{.PLATFORMS}}{{end}}"
     cmds:
       - mkdir -p {{.BIN_DIR}}
       - |
-        for platform in {{.TARGET_PLATFORMS}}; do
+        for platform in {{.PLATFORMS}}; do
           IFS="/" read -r os arch <<< "$platform"
           echo "Building for $os/$arch..."
           env CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/strender-$os-$arch .
@@ -58,28 +55,98 @@ tasks:
       - sh: test -d ~/bin
         msg: "~/bin directory does not exist"
 
-  release:
-    desc: Create a GitHub release (requires version argument)
+  publish:
+    desc: Publish binaries to an existing GitHub release (requires version argument)
+    deps: [build]
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
           echo "ERROR: Must provide release version as argument"
-          echo "Usage: task release -- v1.0.0"
+          echo "Usage: task publish -- v1.0.0"
           exit 1
         fi
 
-        # Build all platforms first
-        task build
+        RELEASE_TAG="{{.CLI_ARGS}}"
 
-        # Create release with all binaries
-        gh release create {{.CLI_ARGS}} \
-          --generate-notes \
+        # Check if release exists
+        if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          echo "ERROR: Release $RELEASE_TAG does not exist"
+          echo "Available releases:"
+          gh release list --limit 10
+          exit 1
+        fi
+
+        echo "Publishing binaries to release $RELEASE_TAG..."
+
+        # Upload each binary with a descriptive label
+        gh release upload "$RELEASE_TAG" \
+          "{{.BIN_DIR}}/strender-darwin-arm64#MacOS Arm64" \
+          "{{.BIN_DIR}}/strender-darwin-amd64#MacOS x64" \
+          "{{.BIN_DIR}}/strender-linux-arm64#Linux Arm64" \
+          "{{.BIN_DIR}}/strender-linux-amd64#Linux x64" \
+          --clobber
+
+        echo "Successfully published binaries to release $RELEASE_TAG"
+
+    preconditions:
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "GitHub CLI (gh) is required but not installed"
+
+  publish-draft:
+    desc: Create a draft release and publish binaries (requires version argument)
+    deps: [build]
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "ERROR: Must provide release version as argument"
+          echo "Usage: task publish-draft -- v1.0.0"
+          exit 1
+        fi
+
+        RELEASE_TAG="{{.CLI_ARGS}}"
+
+        # Check if release already exists
+        if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          echo "ERROR: Release $RELEASE_TAG already exists"
+          echo "Use 'task publish -- $RELEASE_TAG' to update an existing release"
+          exit 1
+        fi
+
+        echo "Creating draft release $RELEASE_TAG and publishing binaries..."
+
+        # Create draft release with binaries
+        gh release create "$RELEASE_TAG" \
           --draft \
-          --latest \
+          --generate-notes \
+          --title "$RELEASE_TAG" \
           "{{.BIN_DIR}}/strender-darwin-arm64#MacOS Arm64" \
           "{{.BIN_DIR}}/strender-darwin-amd64#MacOS x64" \
           "{{.BIN_DIR}}/strender-linux-arm64#Linux Arm64" \
           "{{.BIN_DIR}}/strender-linux-amd64#Linux x64"
+
+        echo "Successfully created draft release $RELEASE_TAG with binaries"
+        echo "Visit GitHub to review and publish the release"
+    preconditions:
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "GitHub CLI (gh) is required but not installed"
+
+  unrelease:
+    desc: Delete a GitHub release
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "ERROR: Must provide release version as argument"
+          echo "Usage: task unrelease -- v1.0.0"
+          exit 1
+        fi
+
+        gh release delete {{.CLI_ARGS}} --yes
+        git push origin --delete {{.CLI_ARGS}} || echo "Tag may not exist remotely"
+
+  list-releases:
+    desc: List GitHub releases
+    cmds:
+      - gh release list --limit 20
     preconditions:
       - sh: command -v gh >/dev/null 2>&1
         msg: "GitHub CLI (gh) is required but not installed"

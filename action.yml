@@ -111,7 +111,7 @@ runs:
         echo "Rendering diagrams from ${{ inputs.workspace }} to ${{ inputs.output-dir }}"
         
         # Run the renderer
-        ./strender -outdir "${{ inputs.output-dir }}" -browser "${{ steps.setup-chrome.outputs.chrome-path }}" -rod "--no-sandbox" "${{ inputs.workspace }}"
+        ./strender -outdir "${{ inputs.output-dir }}" -browser "${{ steps.setup-chrome.outputs.chrome-path }}" "${{ inputs.workspace }}"
         
         # Count generated PNG files
         DIAGRAM_COUNT=$(find "${{ inputs.output-dir }}" -name "*.png" -type f | wc -l)
