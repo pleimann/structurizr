@@ -94,7 +94,8 @@ func (r *Renderer) ExportAllViews(outDir *string) {
 	page.Wait(&rod.EvalOptions{JS: "structurizr.scripting && structurizr.scripting.isDiagramRendered() === true"})
 
 	// Load workspace into structurizr
-	views := page.MustEval("(workspaceContent) => load(workspaceContent)", workspaceContent).Arr()
+	views := page.MustEval("(workspaceFilename, workspaceContent) => load(workspaceFilename, workspaceContent)",
+		r.workspaceFileName, workspaceContent).Arr()
 
 	fmt.Println(" DONE")
 
