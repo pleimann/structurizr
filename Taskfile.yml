@@ -136,7 +136,7 @@ tasks:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
           echo "ERROR: Must provide release version as argument"
-          echo "Usage: task unrelease -- v1.0.0"
+          echo "Usage: task unrelease -- v1"
           exit 1
         fi
 

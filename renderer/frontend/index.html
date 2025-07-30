@@ -76,14 +76,12 @@
     }
 
     function load(workspaceFilename, workspaceContent) {
-      if (workspaceContent == "") return;
+      if (workspaceContent == "" || !workspaceFilename.endsWith(".json")) return;
 
       if (workspaceFilename.endsWith(".json")) {
         const jsonWorkspaceContent = JSON.parse(workspaceContent);
   
         structurizr.workspace = new structurizr.Workspace(jsonWorkspaceContent);
-      } else {
-        structurizr.workspace = new structurizr.Workspace(workspaceContent);
       }
 
       diagram = new structurizr.ui.Diagram("diagram", false);

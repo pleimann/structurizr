@@ -80,11 +80,32 @@ runs:
         fi
         
         echo "Downloading $BINARY_NAME from $DOWNLOAD_URL"
-        curl -L -o strender "$DOWNLOAD_URL"
-        chmod +x strender
-        
+
+        if [ ! -f "strender" ]; then
+          curl -L -o ./strender "$DOWNLOAD_URL"
+          chmod +x ./strender
+        fi
+
         # Verify the binary works
         ./strender --help || echo "Binary downloaded successfully"
+
+    - name: Download structurizr-cli binary
+      shell: bash
+      run: |
+        DOWNLOAD_URL="https://github.com/structurizr/cli/releases/latest/download/structurizr-cli.zip"
+
+        echo "Downloading Structurizr CLI from $DOWNLOAD_URL"
+
+        if [ ! -f "./cli/structurizr-cli.zip" ]; then
+          mkdir -p ./cli
+          curl -L -o ./cli/structurizr-cli.zip "$DOWNLOAD_URL"
+
+          unzip -q ./cli/structurizr-cli.zip -d ./cli
+          chmod +x ./cli/structurizr.sh
+        fi
+
+        # Verify the binary works
+        ./cli/structurizr.sh help
 
     - name: Install Chrome
       uses: browser-actions/setup-chrome@v2
@@ -108,10 +129,20 @@ runs:
       id: render
       shell: bash
       run: |
-        echo "Rendering diagrams from ${{ inputs.workspace }} to ${{ inputs.output-dir }}"
+        WORKSPACE_FILE="${{ inputs.workspace }}"
+
+        if [[ "$WORKSPACE_FILE" == *.dsl ]]; then
+          WORKSPACE_FILE="${WORKSPACE_FILE%.*}.json"
+
+          echo "Converting ${{ inputs.workspace }} to $WORKSPACE_FILE"
+
+          ./cli/structurizr.sh export -format json -workspace ${{ inputs.workspace }}
+        fi
+
+        echo "Rendering diagrams from $WORKSPACE_FILE to ${{ inputs.output-dir }}"
         
         # Run the renderer
-        ./strender -outdir "${{ inputs.output-dir }}" -browser "${{ steps.setup-chrome.outputs.chrome-path }}" "${{ inputs.workspace }}"
+        ./strender -outdir "${{ inputs.output-dir }}" -browser "${{ steps.setup-chrome.outputs.chrome-path }}" "$WORKSPACE_FILE"
         
         # Count generated PNG files
         DIAGRAM_COUNT=$(find "${{ inputs.output-dir }}" -name "*.png" -type f | wc -l)
