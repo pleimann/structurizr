@@ -85,7 +85,10 @@ func (r *Renderer) ExportAllViews(outDir *string) {
 
 	viewRenderCount := 0
 	page.MustExpose("savePng", func(g gson.JSON) (interface{}, error) {
-		r.saveDiagram(*outDir, g.Get("viewKey").Str(), g.Get("png").Str(), &viewRenderCount)
+		viewKey := g.Get("viewKey").Str()
+		png := g.Get("png").Str()
+
+		r.saveDiagram(*outDir, viewKey, png, &viewRenderCount)
 
 		return nil, nil
 	})
@@ -100,7 +103,38 @@ func (r *Renderer) ExportAllViews(outDir *string) {
 	fmt.Println(" DONE")
 
 	for _, view := range views {
-		page.MustEval("async (viewKey) => { await render(viewKey).then(png => savePng({ viewKey, png })); }", view.Get("key"))
+		viewKey := view.Get("key").Str()
+		viewType := view.Get("type").Str()
+
+		if viewType == "Image" {
+			contentUrl := view.Get("content").Str()
+			contentType := view.Get("contentType").Str()
+
+			if strings.Contains(contentType, "image/png") {
+				resp, err := http.Get(contentUrl)
+				if err != nil {
+					fmt.Printf("failed to make HTTP request for image (%s): %s\n", contentUrl, err.Error())
+				}
+				defer resp.Body.Close() // Close the response body when the function exits
+
+				// Check if the request was successful (status code 200 OK)
+				if resp.StatusCode != http.StatusOK {
+					fmt.Printf("failed to make HTTP request for image (%s): bad status code: %s\n", contentUrl, resp.Status)
+				}
+
+				bodyBytes, err := io.ReadAll(resp.Body)
+				if err != nil {
+					fmt.Printf("Error reading response body: %s\n", err.Error())
+				}
+
+				png := base64.StdEncoding.EncodeToString(bodyBytes)
+
+				r.saveDiagram(*outDir, viewKey, png, &viewRenderCount)
+			}
+
+		} else {
+			page.MustEval("async (viewKey) => { await render(viewKey).then(png => savePng({ viewKey, png })); }", viewKey)
+		}
 	}
 
 	fmt.Printf("Exported %d of %d diagram(s)\n", viewRenderCount, len(views))
@@ -118,7 +152,7 @@ func (r *Renderer) saveDiagram(outDir string, diagramName string, b64data string
 
 	defer file.Close()
 
-	fmt.Printf("Exporting `%s`...", fileName)
+	fmt.Printf("Saving `%s`...", fileName)
 
 	_, err = io.Copy(file, reader)
 

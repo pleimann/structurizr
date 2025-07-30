@@ -82,7 +82,7 @@ runs:
         echo "Downloading $BINARY_NAME from $DOWNLOAD_URL"
 
         if [ ! -f "strender" ]; then
-          curl -L -o ./strender "$DOWNLOAD_URL"
+          curl -L -sS -o ./strender "$DOWNLOAD_URL"
           chmod +x ./strender
         fi
 
@@ -97,8 +97,8 @@ runs:
         echo "Downloading Structurizr CLI from $DOWNLOAD_URL"
 
         if [ ! -f "./cli/structurizr-cli.zip" ]; then
-          mkdir -p ./cli
-          curl -L -o ./cli/structurizr-cli.zip "$DOWNLOAD_URL"
+          mkdir -p cli
+          curl -L -sS -o ./cli/structurizr-cli.zip "$DOWNLOAD_URL"
 
           unzip -q ./cli/structurizr-cli.zip -d ./cli
           chmod +x ./cli/structurizr.sh

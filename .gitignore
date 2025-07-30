@@ -36,3 +36,6 @@ structurizr-renderer
 
 workspace.json
 
+cli
+workspace
+docs

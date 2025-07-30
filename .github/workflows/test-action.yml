@@ -3,6 +3,14 @@ name: Test Action
 on:
   workflow_dispatch:
 
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
 jobs:
   test:
     name: Render Architecture Diagrams
@@ -10,15 +18,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Render diagrams (DSL)
-        uses: pleimann/structurizr@v1
-        with:
-          workspace: 'big-bank-plc.dsl'
-          output-dir: 'docs/diagrams/dsl'
 
       - name: Render diagrams (JSON)
         uses: pleimann/structurizr@v1
         with:
           workspace: 'big-bank-plc.json'
           output-dir: 'docs/diagrams/json'
+      
+      - name: Render diagrams (DSL)
+        uses: pleimann/structurizr@v1
+        with:
+          workspace: 'big-bank-plc.dsl'
+          output-dir: 'docs/diagrams/dsl'
